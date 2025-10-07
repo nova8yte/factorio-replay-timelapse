@@ -2,14 +2,12 @@
 local resolution = {x = 1920, y = 1080}  -- Output image resolution (1080p)
 --local resolution = {x = 3840, y = 2160}  -- Output image resolution (4k)
 local framerate = 60                     -- Timelapse frames per second
-local speedup = 300                      -- Game seconds per timelapse second
+local speedup = 200                      -- Game seconds per timelapse second
 local watch_rocket_launch = false        -- If true, slow down to real time and zoom in on first rocket launch
 
 local output_dir = "replay-timelapse"    -- Output directory (relative to Factorio script output directory)
 local screenshot_filename_pattern = output_dir .. "/%08d-base.png"
 local rocket_screenshot_filename_pattern = output_dir .. "/%08d-rocket.png"
-local research_progress_filename = output_dir .. "/research-progress.csv"
-local events_filename = output_dir .. "/events.csv"
 
 -- Camera movement parameters
 local min_zoom = 0.03125 * 4             -- Min zoom level (widest field of view)
@@ -135,7 +133,6 @@ function sirp(t)
   return (math.sin((t - 0.5) * math.pi) + 1) / 2
 end
 
-
 -- Ease-in interpolation between 0 and 1
 -- t: Interpolation parameter in the interval [0, 1]
 -- f: Interpolation point where easing ends
@@ -149,14 +146,12 @@ function ease_in(t, f)
   end
 end
 
-
 -- Ease-out interpolation between 0 and 1
 -- t: Interpolation parameter in the interval [0, 1]
 -- f: Interpolation point from end where easing ends
 function ease_out(t, f)
   return 1 - ease_in(1 - t, f)
 end
-
 
 -- Ease-in-out interpolation between 0 and 1
 -- t: Interpolation parameter in the interval [0, 1]
@@ -168,7 +163,6 @@ function ease_in_out(t, f)
     return ease_out((t - 0.5) * 2, f * 2) / 2 + 0.5
   end
 end
-
 
 -- Clamp number within a range
 -- t: Number to clamp
@@ -351,29 +345,6 @@ function pan_camera_to_cover_bbox(camera, bbox)
   return camera
 end
 
--- Compute an ffmpeg time duration expressing the given frame count.
-function frame_to_timestamp(frame)
-  local s = math.floor(frame / framerate)
-  local m = math.floor(s / 60)
-  local h = math.floor(m / 60)
-  local f = frame % framerate
-  return string.format("%02d:%02d:%02d:%02d", h, m % 60, s % 60, f)
-end
-
--- Write CSV headers to the research progress files.
-function init_research_csv()
-  game.write_file(
-    events_filename,
-    string.format("%s,%s,%s,%s\n", "tick", "frame", "timestamp", "event"),
-    false
-  )
-  game.write_file(
-    research_progress_filename,
-    string.format("%s,%s,%s,%s,%s,%s\n", "state", "tick", "frame", "timestamp", "research_name", "research_progress"),
-    false
-  )
-end
-
 function run()
   local bbox = { l = -30, r = 30, t = -30, b = 30 }
   local current_camera = compute_camera(bbox)
@@ -408,42 +379,10 @@ function run()
       force_render = true,
     }
 
-    local force = game.players[1].force
-    if force.current_research then
-      local research = force.current_research
-      game.write_file(
-        research_progress_filename,
-        string.format(
-          "current,%s,%s,%s,%s,%s\n",
-          tick,
-          frame_num,
-          frame_to_timestamp(frame_num),
-          research.name,
-          force.research_progress
-        ),
-        true
-      )
-    else
-      game.write_file(
-        research_progress_filename,
-        string.format(
-          "none,%s,%s,%s,,\n",
-          tick,
-          frame_num,
-          frame_to_timestamp(frame_num)
-        ),
-        true
-      )
-    end
-
     frame_num = frame_num + 1
   end
 
   function watch_base(event)
-    if event.tick == 0 then
-      init_research_csv()
-    end
-
     local base_bb = base_bbox()
     local expanded_bbox = expand_bbox(bbox, base_bb)
     if (expanded_bbox.l < last_expansion_bbox.l)
@@ -555,26 +494,6 @@ function run()
   script.on_nth_tick(nth_tick, watch_base)
 
   script.on_event(
-    defines.events.on_research_finished,
-    function (event)
-      game.write_file(
-        events_filename,
-        string.format(
-          "%s,%s,%s,%s,%s,",
-          event.tick,
-          frame_num,
-          frame_to_timestamp(frame_num),
-          "research-finished",
-          event.research.name
-        ),
-        true
-      )
-      game.write_file(events_filename, event.research.localised_name, true)
-      game.write_file(events_filename, "\n", true)
-    end
-  )
-
-  script.on_event(
     defines.events.on_built_entity,
     function (event)
       local idx = (event.tick % recently_built_ticks) + 1
@@ -599,36 +518,8 @@ function run()
   )
 
   script.on_event(
-    defines.events.on_rocket_launched,
-    function (event)
-      game.write_file(
-        events_filename,
-        string.format(
-          "%s,%s,%s,%s\n",
-          event.tick,
-          frame_num,
-          frame_to_timestamp(frame_num),
-          "rocket-launched"
-        ),
-        true
-      )
-    end
-  )
-
-  script.on_event(
     defines.events.on_rocket_launch_ordered,
     function (event)
-      game.write_file(
-        events_filename,
-        string.format(
-          "%s,%s,%s,%s\n",
-          event.tick,
-          frame_num,
-          frame_to_timestamp(frame_num),
-          "rocket-launch-ordered"
-        ),
-        true
-      )
       if watch_rocket_launch and (watching_rocket_silo == nil) then
         script.on_nth_tick(nil)
         rocket_start_tick = event.tick
