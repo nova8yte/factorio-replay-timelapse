@@ -27,7 +27,7 @@ SRC_DIR=$(dirname "$0")
 
 
 mkdir -p "${EXTRACT_DIR}"
-unzip -q -u -d "${EXTRACT_DIR}" "${SAVE_FILE}"
+unzip -oq -d "${EXTRACT_DIR}" "${SAVE_FILE}"
 cp "${SRC_DIR}/replay-timelapse.lua" "${SAVE_EXTRACT_DIR}/"
 if ! grep -q 'replay-timelapse' "${SAVE_EXTRACT_DIR}/control.lua"; then
   cat "${SRC_DIR}/control.lua" >> "${SAVE_EXTRACT_DIR}/control.lua"
