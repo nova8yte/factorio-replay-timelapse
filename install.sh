@@ -12,9 +12,10 @@ print_usage() {
   exit 1
 }
 
-if [[ -z "${SAVE_FILE}" ]]; then
+if [ -z "${SAVE_FILE}" ]; then
   print_usage
 fi
+
 
 
 SAVE_NAME=$(basename "${1%.zip}")
